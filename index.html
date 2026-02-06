@@ -138,7 +138,7 @@
             <div class="flex justify-start message-anim">
                 <div class="max-w-[85%] md:max-w-[70%] glass-panel bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl rounded-tl-sm px-6 py-4 text-gray-100 border-l-4 border-indigo-500">
                     <p class="text-lg">Bonjour ! Je suis <strong class="text-indigo-400">M.MOUAD IA</strong>.</p>
-                    <p class="text-sm opacity-80 mt-1">Si vous voyez une erreur "Clé invalide", cliquez sur l'engrenage en haut à droite pour en mettre une nouvelle.</p>
+                    <p class="text-sm opacity-80 mt-1">GLM 4.5 Air est de retour ! Choisissez votre modèle préféré dans les paramètres.</p>
                 </div>
             </div>
         </main>
@@ -192,10 +192,8 @@
                 <div>
                     <label class="block text-sm text-gray-300 mb-2 font-medium">Modèle IA</label>
                     <select id="model-select" class="w-full bg-gray-900/80 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500 text-white appearance-none cursor-pointer hover:bg-gray-800/80 transition-colors">
-                        <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Recommandé)</option>
-                        <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (Très Rapide)</option>
-                        <option value="deepseek/deepseek-r1-distill-llama-70b:free">DeepSeek R1 (Populaire)</option>
-                        <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (Léger)</option>
+                        <option value="z-ai/glm-4.5-air:free">GLM 4.5 Air (Free)</option>
+                        <option value="arcee-ai/trinity-large-preview:free">Trinity Large (Free Preview)</option>
                     </select>
                 </div>
 
@@ -209,7 +207,6 @@
 
     <script>
         // CONFIGURATION DEFAULT
-        // Note: Cette clé publique est probablement expirée. L'utilisateur doit en mettre une nouvelle.
         const DEFAULT_API_KEY = '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';
         const API_URL = 'https://openrouter.ai/api/v1/chat/completions'; 
 
@@ -228,7 +225,8 @@
         const modelSelect = document.getElementById('model-select');
 
         // STATE
-        let currentModel = localStorage.getItem('mmouad_model') || 'meta-llama/llama-3.3-70b-instruct:free';
+        // On remet GLM par défaut s'il n'y a rien de sauvegardé
+        let currentModel = localStorage.getItem('mmouad_model') || 'z-ai/glm-4.5-air:free';
         let currentKey = localStorage.getItem('mmouad_key') || DEFAULT_API_KEY;
         let messages = [{
             role: "system",
@@ -236,8 +234,15 @@
         }];
 
         // INIT UI
-        modelSelect.value = currentModel;
-        // On ne pré-remplit le champ que si l'utilisateur a déjà mis une clé perso, sinon on laisse vide pour l'inciter à coller
+        // Force dropdown to match currentModel
+        if (modelSelect.querySelector(`option[value="${currentModel}"]`)) {
+            modelSelect.value = currentModel;
+        } else {
+            // Si le modèle sauvegardé n'existe plus, on prend le premier de la liste
+            modelSelect.selectedIndex = 0;
+            currentModel = modelSelect.value;
+        }
+        
         if(currentKey !== DEFAULT_API_KEY) {
             apiKeyInput.value = currentKey;
         }
@@ -270,7 +275,6 @@
 
         // SETTINGS LOGIC
         openSettingsBtn.addEventListener('click', () => {
-            // Si c'est la clé par défaut (cassée), on vide le champ pour que ce soit plus clair
             if (currentKey === DEFAULT_API_KEY) {
                 apiKeyInput.value = '';
                 apiKeyInput.placeholder = "Collez votre nouvelle clé sk-or-... ici";
@@ -290,7 +294,6 @@
                 currentKey = newKey;
                 localStorage.setItem('mmouad_key', currentKey);
             } else {
-                // Si l'utilisateur vide le champ, on remet le défaut (même s'il marche pas, pour éviter crash)
                 currentKey = DEFAULT_API_KEY;
                 localStorage.removeItem('mmouad_key');
             }
@@ -298,7 +301,7 @@
             currentModel = modelSelect.value;
             localStorage.setItem('mmouad_model', currentModel);
             
-            addMessageToUI('Paramètres mis à jour.', 'system');
+            addMessageToUI('Paramètres mis à jour. Modèle: ' + currentModel.split(':')[0], 'system');
             closeModal();
         });
 
@@ -335,11 +338,11 @@
                     
                     if (response.status === 401) {
                         errorMessage = "Clé API invalide ou expirée. Cliquez ici pour ouvrir les paramètres.";
-                        settingsModal.classList.remove('hidden'); // Auto open settings
+                        settingsModal.classList.remove('hidden'); 
                     }
                     if (response.status === 429) errorMessage = "Trop de demandes (Rate Limit). Réessayez plus tard.";
-                    if (response.status === 503) errorMessage = "Le modèle est surchargé. Essayez de changer de modèle dans les paramètres.";
-                    if (errorMessage.includes("No endpoints found")) errorMessage = "Ce modèle est indisponible. Changez de modèle dans les paramètres (⚙️).";
+                    if (response.status === 503) errorMessage = "Le modèle est surchargé. Essayez plus tard.";
+                    if (errorMessage.includes("No endpoints found")) errorMessage = "Ce modèle est indisponible momentanément.";
 
                     throw new Error(errorMessage);
                 }
@@ -358,7 +361,6 @@
 
             } catch (error) {
                 removeLoadingIndicator(loadingId);
-                // Message d'erreur cliquable pour ouvrir les settings si besoin
                 if (error.message.includes("Clé API")) {
                      const div = document.createElement('div');
                      div.className = 'flex justify-start message-anim mb-4';
